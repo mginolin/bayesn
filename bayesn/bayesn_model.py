@@ -1421,9 +1421,11 @@ class SEDmodel(object):
         M_step_HM = numpyro.sample('M_step_HM', dist.Uniform(-0.2, 0.2))
         M_step_LM = numpyro.sample('M_step_LM', dist.Uniform(-0.2, 0.2))
 
-        mass = obs[-7, 0, :]
+        mass = obs[-8, 0, :]
+        mass_err = obs[-7, 0, :]
         M_split = 10  # Hardcoded for now, should make this customisable
-        HM_flag = mass > M_split
+        #HM_flag = mass > M_split
+        HM_flag = 1 - norm.cdf(10, loc=mass, scale=mass_err)
 
         with numpyro.plate('SNe', sample_size) as sn_index:
             theta = numpyro.sample(f'theta', dist.Normal(0, 1.0))
@@ -1517,9 +1519,11 @@ class SEDmodel(object):
         sigma0_LM_tform = numpyro.sample('sigma0_LM_tform', dist.Uniform(0, jnp.pi / 2.))
         sigma0_LM = numpyro.deterministic('sigma0_LM', 0.1 * jnp.tan(sigma0_LM_tform))
 
-        mass = obs[-7, 0, :]
+        mass = obs[-8, 0, :]
+        mass_err = obs[-7, 0, :]
         M_split = 10
-        HM_flag = mass > M_split
+        #HM_flag = mass > M_split
+        HM_flag = 1 - norm.cdf(10, loc=mass, scale=mass_err)
 
         with numpyro.plate('SNe', sample_size) as sn_index:
             theta = numpyro.sample(f'theta', dist.Normal(0., 1.))
@@ -2516,10 +2520,11 @@ class SEDmodel(object):
                         data['redshift_error'] = zhel_err
                         data['MWEBV'] = meta.get('MWEBV', 0.)
                         data['mass'] = meta.get('HOSTGAL_LOGMASS', -9.)
+                        data['mass_err'] = meta.get('HOSTGAL_LOGMASS_ERR', 0)
                         data['dist_mod'] = self.cosmo.distmod(zhd)
                         data['mask'] = 1
                         lc = data[
-                            ['t', 'flux', 'flux_err', 'MAG', 'MAGERR', 'mass', 'band_indices', 'redshift',
+                            ['t', 'flux', 'flux_err', 'MAG', 'MAGERR', 'mass', 'mass_err', 'band_indices', 'redshift',
                              'redshift_error', 'dist_mod', 'MWEBV', 'mask', 'MJD', 'FLT']]
                         lc = lc.dropna(subset=['flux', 'flux_err'])
                         lc = lc[(lc['t'] > -10) & (lc['t'] < 40)]
@@ -2633,10 +2638,11 @@ class SEDmodel(object):
                     data['redshift_error'] = zhel_err
                     data['MWEBV'] = meta.get('MWEBV', 0.)
                     data['mass'] = meta.get('HOSTGAL_LOGMASS', -9.)
+                    data['mass_err'] = meta.get('HOSTGAL_LOGMASS_ERR', 0)
                     data['dist_mod'] = self.cosmo.distmod(zhd)
                     data['mask'] = 1
                     lc = data[
-                        ['t', 'flux', 'flux_err', 'MAG', 'MAGERR', 'mass', 'band_indices', 'redshift',
+                        ['t', 'flux', 'flux_err', 'MAG', 'MAGERR', 'mass', 'mass_err', 'band_indices', 'redshift',
                          'redshift_error', 'dist_mod', 'MWEBV', 'mask', 'MJD', 'FLT']]
                     lc = lc.dropna(subset=['flux', 'flux_err'])
                     lc = lc[(lc['t'] > self.tau_knots.min()) & (lc['t'] < self.tau_knots.max())]
@@ -2708,8 +2714,8 @@ class SEDmodel(object):
             t = t.flatten(order='F')
             J_t = self.J_t_map(t, self.tau_knots, self.KD_t).reshape((*keep_shape, self.tau_knots.shape[0]),
                                                                      order='F').transpose(1, 2, 0)
-            flux_data = all_data[[0, 1, 2, 5, 6, 7, 8, 9, 10, 11], ...]
-            mag_data = all_data[[0, 3, 4, 5, 6, 7, 8, 9, 10, 11], ...]
+            flux_data = all_data[[0, 1, 2, 5, 6, 7, 8, 9, 10, 11, 12], ...]
+            mag_data = all_data[[0, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], ...]
             # Mask out negative fluxes, only for mag data--------------------------
             for i in range(len(all_lcs)):
                 mag_data[:2, (flux_data[1, ...] <= 0)] = 0  # Mask out photometry
@@ -2885,8 +2891,8 @@ class SEDmodel(object):
             t = t.flatten(order='F')
             J_t = self.J_t_map(t, self.tau_knots, self.KD_t).reshape((*keep_shape, self.tau_knots.shape[0]),
                                                                      order='F').transpose(1, 2, 0)
-            flux_data = all_data[[0, 1, 2, 5, 6, 7, 8, 9, 10, 11], ...]
-            mag_data = all_data[[0, 3, 4, 5, 6, 7, 8, 9, 10, 11], ...]
+            flux_data = all_data[[0, 1, 2, 5, 6, 7, 8, 9, 10, 11, 12], ...]
+            mag_data = all_data[[0, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], ...]
             # Mask out negative fluxes, only for mag data--------------------------
             for i in range(len(all_lcs)):
                 mag_data[:2, (flux_data[1, ...] <= 0)] = 0  # Mask out photometry
