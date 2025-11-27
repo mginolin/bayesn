@@ -1423,7 +1423,7 @@ class SEDmodel(object):
 
         mass = obs[-8, 0, :]
         mass_err = obs[-7, 0, :]
-        M_split = 10  # Hardcoded for now, should make this customisable
+        M_split = 1  # Hardcoded for now, should make this customisable
         #HM_flag = mass > M_split
         HM_flag = 1 - norm.cdf(10, loc=mass, scale=mass_err)
 
@@ -1521,7 +1521,7 @@ class SEDmodel(object):
 
         mass = obs[-8, 0, :]
         mass_err = obs[-7, 0, :]
-        M_split = 10
+        M_split = 1
         #HM_flag = mass > M_split
         HM_flag = 1 - norm.cdf(10, loc=mass, scale=mass_err)
 
@@ -2822,10 +2822,11 @@ class SEDmodel(object):
                     data['redshift_error'] = row.REDSHIFT_CMB_ERR
                     data['MWEBV'] = meta.get('MWEBV', 0.)
                     data['mass'] = meta.get('HOSTGAL_LOGMASS', -9.)
+                    data['mass_err'] = meta.get('HOSTGAL_LOGMASS_ERR', 0.)
                     data['dist_mod'] = self.cosmo.distmod(row.REDSHIFT_CMB)
                     data['mask'] = 1
                     lc = data[
-                        ['t', 'flux', 'flux_err', 'MAG', 'MAGERR', 'mass', 'band_indices', 'redshift', 'redshift_error',
+                        ['t', 'flux', 'flux_err', 'MAG', 'MAGERR', 'mass', 'mass_err', 'band_indices', 'redshift', 'redshift_error',
                          'dist_mod', 'MWEBV', 'mask', 'MJD', 'FLT']]
                     lc = lc.dropna(subset=['flux', 'flux_err'])
                     lc = lc[(lc['t'] > self.tau_knots.min()) & (lc['t'] < self.tau_knots.max())]
