@@ -1425,7 +1425,7 @@ class SEDmodel(object):
         mass_err = obs[-7, 0, :]
         M_split = 1  # Hardcoded for now, should make this customisable
         #HM_flag = mass > M_split
-        HM_flag = 1 - norm.cdf(10, loc=mass, scale=mass_err)
+        HM_flag = 1 - norm.cdf(M_split, loc=mass, scale=mass_err)
 
         with numpyro.plate('SNe', sample_size) as sn_index:
             theta = numpyro.sample(f'theta', dist.Normal(0, 1.0))
@@ -1523,7 +1523,7 @@ class SEDmodel(object):
         mass_err = obs[-7, 0, :]
         M_split = 1
         #HM_flag = mass > M_split
-        HM_flag = 1 - norm.cdf(10, loc=mass, scale=mass_err)
+        HM_flag = 1 - norm.cdf(M_split, loc=mass, scale=mass_err)
 
         with numpyro.plate('SNe', sample_size) as sn_index:
             theta = numpyro.sample(f'theta', dist.Normal(0., 1.))
