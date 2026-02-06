@@ -1381,6 +1381,70 @@ class SEDmodel(object):
             with numpyro.handlers.mask(mask=mask):
                 numpyro.sample(f'obs', dist.Normal(flux, obs[2, :, sn_index].T), obs=obs[1, :, sn_index].T)
 
+    def split_achromatic_step(self, obs, weights):
+        """
+        Numpryo model used to infer an achromatic step conditioned on fixed SN and dust population parameters from a previously
+        trained model
+
+        Parameters
+        ----------
+        obs: array-like
+            Data to fit, from output of process_dataset
+        weights: array-like
+            Band weights based on filter responses and MW extinction curves for numerical flux integrals
+
+        """
+        sample_size = self.data.shape[-1]
+        N_knots_sig = (self.l_knots.shape[0] - 2) * self.tau_knots.shape[0]
+
+        sigma0_HM_tform = numpyro.sample('sigma0_HM_tform', dist.Uniform(0, jnp.pi / 2.))
+        sigma0_HM = numpyro.deterministic('sigma0_HM', 0.1 * jnp.tan(sigma0_HM_tform))
+
+        sigma0_LM_tform = numpyro.sample('sigma0_LM_tform', dist.Uniform(0, jnp.pi / 2.))
+        sigma0_LM = numpyro.deterministic('sigma0_LM', 0.1 * jnp.tan(sigma0_LM_tform))
+
+        M_step_HM = numpyro.sample('M_step_HM', dist.Uniform(-0.2, 0.2))
+        M_step_LM = numpyro.sample('M_step_LM', dist.Uniform(-0.2, 0.2))
+
+        mass = obs[-8, 0, :]
+        mass_err = obs[-7, 0, :]
+        M_split = 1  # Hardcoded for now, should make this customisable
+        #HM_flag = mass > M_split
+        HM_flag = 1 - norm.cdf(M_split, loc=mass, scale=mass_err)
+
+        with numpyro.plate('SNe', sample_size) as sn_index:
+            theta = numpyro.sample(f'theta', dist.Normal(0, 1.0))
+            Av = numpyro.sample(f'AV', dist.Exponential(1 / self.tauA))
+
+            M0 = self.M0 * jnp.ones_like(theta) + HM_flag * M_step_HM + (1 - HM_flag) * M_step_LM
+
+            eps_mu = jnp.zeros(N_knots_sig)
+            eps_tform = numpyro.sample('eps_tform', dist.MultivariateNormal(eps_mu, jnp.eye(N_knots_sig)))
+            eps_tform = eps_tform.T
+            eps = numpyro.deterministic('eps', jnp.matmul(self.L_Sigma, eps_tform))
+            eps = eps.T
+            eps = jnp.reshape(eps, (sample_size, self.l_knots.shape[0] - 2, self.tau_knots.shape[0]), order='F')
+            eps_full = jnp.zeros((sample_size, self.l_knots.shape[0], self.tau_knots.shape[0]))
+            eps = eps_full.at[:, 1:-1, :].set(eps)
+
+            sigma0 = HM_flag * sigma0_HM + (1 - HM_flag) * sigma0_LM
+
+            band_indices = obs[-6, :, sn_index].astype(int).T
+            redshift = obs[-5, 0, sn_index]
+            redshift_error = obs[-4, 0, sn_index]
+            muhat = obs[-3, 0, sn_index]
+            ebv = obs[-2, 0, sn_index]
+
+            mask = obs[-1, :, sn_index].T.astype(bool)
+            muhat_err = 5 / (redshift * jnp.log(10)) * jnp.sqrt(
+                jnp.power(redshift_error, 2) + np.power(self.sigma_pec, 2))
+            Ds_err = jnp.sqrt(muhat_err * muhat_err + sigma0 * sigma0)
+            Ds = numpyro.sample('Ds', dist.Normal(muhat, Ds_err))
+            flux = self.get_flux_batch(M0, theta, Av, self.W0, self.W1, eps, Ds, self.RV, band_indices, mask, self.J_t, self.hsiao_interp,
+                                       weights)
+            with numpyro.handlers.mask(mask=mask):
+                numpyro.sample(f'obs', dist.Normal(flux, obs[2, :, sn_index].T), obs=obs[1, :, sn_index].T)
+
     def dust_model_split_mag(self, obs, weights):
         """
         Numpryo model used to infer dust properties conditioned on fixed SN population parameters from a previously
@@ -1423,7 +1487,7 @@ class SEDmodel(object):
 
         mass = obs[-8, 0, :]
         mass_err = obs[-7, 0, :]
-        M_split = 10  # Hardcoded for now, should make this customisable
+        M_split = 1  # Hardcoded for now, should make this customisable
         #HM_flag = mass > M_split
         HM_flag = 1 - norm.cdf(M_split, loc=mass, scale=mass_err)
 
@@ -1521,7 +1585,7 @@ class SEDmodel(object):
 
         mass = obs[-8, 0, :]
         mass_err = obs[-7, 0, :]
-        M_split = 10
+        M_split = 1
         #HM_flag = mass > M_split
         HM_flag = 1 - norm.cdf(M_split, loc=mass, scale=mass_err)
 
@@ -1568,68 +1632,6 @@ class SEDmodel(object):
 
             with numpyro.handlers.mask(mask=mask):
                 numpyro.sample(f'obs', dist.Normal(flux, obs[2, :, sn_index].T), obs=obs[1, :, sn_index].T)
-
-    def split_achromatic_step(self, obs, weights):
-        """
-        Model used to infer an achromatic mass step, but keeping the dust parameters fixed
-
-        Parameters
-        ----------
-        obs: array-like
-            Data to fit, from output of process_dataset
-        weights: array-like
-            Band weights based on filter responses and MW extinction curves for numerical flux integrals
-
-        """
-        sample_size = self.data.shape[-1]
-        N_knots_sig = (self.l_knots.shape[0] - 2) * self.tau_knots.shape[0]       
-
-        sigma0_HM_tform = numpyro.sample('sigma0_HM_tform', dist.Uniform(0, jnp.pi / 2.))
-        sigma0_HM = numpyro.deterministic('sigma0_HM', 0.1 * jnp.tan(sigma0_HM_tform))
-
-        sigma0_LM_tform = numpyro.sample('sigma0_LM_tform', dist.Uniform(0, jnp.pi / 2.))
-        sigma0_LM = numpyro.deterministic('sigma0_LM', 0.1 * jnp.tan(sigma0_LM_tform))
-
-        M_step_HM = numpyro.sample('M_step_HM', dist.Uniform(-0.2, 0.2))
-        M_step_LM = numpyro.sample('M_step_LM', dist.Uniform(-0.2, 0.2))
-
-        mass = obs[-8, 0, :]
-        mass_err = obs[-7, 0, :]
-        M_split = 10  # Hardcoded for now, should make this customisable
-        #HM_flag = mass > M_split
-        HM_flag = 1 - norm.cdf(M_split, loc=mass, scale=mass_err)
-        
-        with numpyro.plate('SNe', sample_size) as sn_index:
-            theta = numpyro.sample(f'theta', dist.Normal(0, 1.0))
-
-            Av = numpyro.sample(f'AV', dist.Exponential(1 / self.tauA))
-
-            M0 = self.M0 * jnp.ones_like(Av) + HM_flag * M_step_HM + (1 - HM_flag) * M_step_LM
-
-            eps_mu = jnp.zeros(N_knots_sig)
-            eps_tform = numpyro.sample('eps_tform', dist.MultivariateNormal(eps_mu, jnp.eye(N_knots_sig)))
-            eps_tform = eps_tform.T
-            eps = numpyro.deterministic('eps', jnp.matmul(self.L_Sigma, eps_tform))
-            eps = eps.T
-            eps = jnp.reshape(eps, (sample_size, self.l_knots.shape[0] - 2, self.tau_knots.shape[0]), order='F')
-            eps_full = jnp.zeros((sample_size, self.l_knots.shape[0], self.tau_knots.shape[0]))
-            eps = eps_full.at[:, 1:-1, :].set(eps)
-
-            sigma0 = HM_flag * sigma0_HM + (1 - HM_flag) * sigma0_LM
-
-            band_indices = obs[-6, :, sn_index].astype(int).T
-            redshift = obs[-5, 0, sn_index]
-            redshift_error = obs[-4, 0, sn_index]
-            muhat = obs[-3, 0, sn_index]
-            ebv = obs[-2, 0, sn_index]
-
-            mask = obs[-1, :, sn_index].T.astype(bool)
-            muhat_err = 5 / (redshift * jnp.log(10)) * jnp.sqrt(jnp.power(redshift_error, 2) + np.power(self.sigma_pec, 2))
-            Ds_err = jnp.sqrt(muhat_err * muhat_err + sigma0 * sigma0)
-            Ds = numpyro.sample('Ds', dist.Normal(muhat, Ds_err))
-            flux = self.get_flux_batch(M0, theta, Av, self.W0, self.W1, eps, Ds, self.Rv, band_indices, mask, self.J_t, self.hsiao_interp, weights)
-            with numpyro.handlers.mask(mask=mask):
-                numpyro.sample(f'obs', dist.Normal(flux, obs[2, :, sn_index].T), obs=obs[1, :, sn_index].T)       
 
     def initial_guess(self, args, reference_model='M20_model'):
         """
