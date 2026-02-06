@@ -1877,6 +1877,11 @@ class SEDmodel(object):
                                init_strategy=init_strategy,
                                dense_mass=False, find_heuristic_step_size=False, regularize_mass_matrix=False,
                                step_size=0.1)
+        elif args['mode'].lower() == 'broken_theta':
+            nuts_kernel = NUTS(self.broken_theta, adapt_step_size=True, target_accept_prob=0.8,
+                               init_strategy=init_strategy,
+                               dense_mass=False, find_heuristic_step_size=False, regularize_mass_matrix=False,
+                               step_size=0.1)    
         elif args['mode'].lower() == 'dust_split_sed':
             nuts_kernel = NUTS(self.dust_model_split_sed, adapt_step_size=True, target_accept_prob=0.8,
                                init_strategy=init_strategy,
