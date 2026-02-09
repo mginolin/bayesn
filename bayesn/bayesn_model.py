@@ -1408,7 +1408,7 @@ class SEDmodel(object):
 
         mass = obs[-8, 0, :]
         mass_err = obs[-7, 0, :]
-        M_split = 1  # Hardcoded for now, should make this customisable
+        M_split = 8.9  # Hardcoded for now, should make this customisable
         #HM_flag = mass > M_split
         HM_flag = 1 - norm.cdf(M_split, loc=mass, scale=mass_err)
 
@@ -1487,7 +1487,7 @@ class SEDmodel(object):
 
         mass = obs[-8, 0, :]
         mass_err = obs[-7, 0, :]
-        M_split = 1  # Hardcoded for now, should make this customisable
+        M_split = 8.9  # Hardcoded for now, should make this customisable
         #HM_flag = mass > M_split
         HM_flag = 1 - norm.cdf(M_split, loc=mass, scale=mass_err)
 
@@ -1585,7 +1585,7 @@ class SEDmodel(object):
 
         mass = obs[-8, 0, :]
         mass_err = obs[-7, 0, :]
-        M_split = 1
+        M_split = 8.9
         #HM_flag = mass > M_split
         HM_flag = 1 - norm.cdf(M_split, loc=mass, scale=mass_err)
 
