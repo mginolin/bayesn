@@ -1381,7 +1381,22 @@ class SEDmodel(object):
             with numpyro.handlers.mask(mask=mask):
                 numpyro.sample(f'obs', dist.Normal(flux, obs[2, :, sn_index].T), obs=obs[1, :, sn_index].T)
 
-    def broken_theta_Rv(self, obs, weights):
+    def broken_W1_Rv(self, obs, weights):
+        """
+        Numpryo model used to infer dust properties and a broken-W1 relation conditioned on fixed SN population parameters from a previously
+        trained model.
+
+        Parameters
+        ----------
+        obs: array-like
+            Data to fit, from output of process_dataset
+        weights: array-like
+            Band weights based on filter responses and MW extinction curves for numerical flux integrals
+
+        Returns
+        -------
+
+        """
         sample_size = self.data.shape[-1]
         N_knots_sig = (self.l_knots.shape[0] - 2) * self.tau_knots.shape[0]
 
@@ -1401,7 +1416,6 @@ class SEDmodel(object):
         theta_break = numpyro.sample('theta_break', dist.Normal(0, 1.0))
         with numpyro.plate('SNe', sample_size) as sn_index:
             theta = numpyro.sample(f'theta', dist.Normal(0, 1.0))
-
             Av = numpyro.sample(f'AV', dist.Exponential(1 / tauA))
 
             Rv_tform = numpyro.sample('Rv_tform', dist.Uniform(0, 1))
@@ -1435,7 +1449,22 @@ class SEDmodel(object):
                 numpyro.sample(f'obs', dist.Normal(flux, obs[2, :, sn_index].T), obs=obs[1, :, sn_index].T)
 
 
-    def broken_theta(self, obs, weights):
+    def broken_W1(self, obs, weights):
+        """
+        Numpryo model used to infer a broken-W1 relation conditioned on fixed SN population and dust parameters from a previously
+        trained model.
+
+        Parameters
+        ----------
+        obs: array-like
+            Data to fit, from output of process_dataset
+        weights: array-like
+            Band weights based on filter responses and MW extinction curves for numerical flux integrals
+
+        Returns
+        -------
+
+        """
         sample_size = self.data.shape[-1]
         N_knots_sig = (self.l_knots.shape[0] - 2) * self.tau_knots.shape[0]       
 
@@ -1449,7 +1478,6 @@ class SEDmodel(object):
         
         with numpyro.plate('SNe', sample_size) as sn_index:
             theta = numpyro.sample(f'theta', dist.Normal(0, 1.0))
-
             Av = numpyro.sample(f'AV', dist.Exponential(1 / self.tauA))
 
             M0 = self.M0 * jnp.ones_like(Av)
@@ -1475,7 +1503,7 @@ class SEDmodel(object):
             muhat_err = 5 / (redshift * jnp.log(10)) * jnp.sqrt(jnp.power(redshift_error, 2) + np.power(self.sigma_pec, 2))
             Ds_err = jnp.sqrt(muhat_err * muhat_err + sigma0 * sigma0)
             Ds = numpyro.sample('Ds', dist.Normal(muhat, Ds_err))
-            flux = self.get_flux_batch(M0, theta_broken, Av, self.W0, self.W1, eps, Ds, self.Rv, band_indices, mask, self.J_t, self.hsiao_interp,weights)
+            flux = self.get_flux_batch(M0, theta_broken, Av, self.W0, self.W1, eps, Ds, self.RV, band_indices, mask, self.J_t, self.hsiao_interp,weights)
             with numpyro.handlers.mask(mask=mask):
                 numpyro.sample(f'obs', dist.Normal(flux, obs[2, :, sn_index].T), obs=obs[1, :, sn_index].T)
 
@@ -1877,8 +1905,13 @@ class SEDmodel(object):
                                init_strategy=init_strategy,
                                dense_mass=False, find_heuristic_step_size=False, regularize_mass_matrix=False,
                                step_size=0.1)
-        elif args['mode'].lower() == 'broken_theta':
-            nuts_kernel = NUTS(self.broken_theta, adapt_step_size=True, target_accept_prob=0.8,
+        elif args['mode'].lower() == 'broken_w1':
+            nuts_kernel = NUTS(self.broken_W1, adapt_step_size=True, target_accept_prob=0.8,
+                               init_strategy=init_strategy,
+                               dense_mass=False, find_heuristic_step_size=False, regularize_mass_matrix=False,
+                               step_size=0.1)
+        elif args['mode'].lower() == 'broken_w1_rv_var':
+            nuts_kernel = NUTS(self.broken_W1_Rv, adapt_step_size=True, target_accept_prob=0.8,
                                init_strategy=init_strategy,
                                dense_mass=False, find_heuristic_step_size=False, regularize_mass_matrix=False,
                                step_size=0.1)    
