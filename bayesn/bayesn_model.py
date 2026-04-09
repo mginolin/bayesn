@@ -1423,7 +1423,7 @@ class SEDmodel(object):
 
             M0 = self.M0 * jnp.ones_like(Rv)
             delta_alpha = alpha_high-alpha_low
-            theta_broken = theta * alpha_low + (jnp.abs(theta-theta_break) + (theta-theta_break))*delta_alpha/2
+            theta_broken = theta * alpha_high + (jnp.abs(theta-theta_break) - (theta-theta_break))*delta_alpha/2
 
             eps_mu = jnp.zeros(N_knots_sig)
             eps_tform = numpyro.sample('eps_tform', dist.MultivariateNormal(eps_mu, jnp.eye(N_knots_sig)))
@@ -1482,7 +1482,8 @@ class SEDmodel(object):
 
             M0 = self.M0 * jnp.ones_like(Av)
             delta_alpha = alpha_high-alpha_low
-            theta_broken = theta * alpha_low + (jnp.abs(theta-theta_break) + (theta-theta_break))*delta_alpha/2
+            # The constant is added so that for theta=0 we get no impact of W1
+            theta_broken = theta * alpha_high + (jnp.abs(theta-theta_break) - (theta-theta_break))*delta_alpha/2
 
             eps_mu = jnp.zeros(N_knots_sig)
             eps_tform = numpyro.sample('eps_tform', dist.MultivariateNormal(eps_mu, jnp.eye(N_knots_sig)))
